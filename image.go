@@ -158,7 +158,7 @@ func computeLayerMIMEType(what string, layerCompression archive.Compression) (om
 		case archive.Gzip:
 			omediaType = v1.MediaTypeImageLayerGzip
 			dmediaType = manifest.DockerV2Schema2LayerMediaType
-			logrus.Debugf("compressing %s with gzip", what)
+			logrus.Infof("compressing %s with gzip", what)
 		case archive.Bzip2:
 			// Until the image specs define a media type for bzip2-compressed layers, even if we know
 			// how to decompress them, we can't try to compress layers with bzip2.
@@ -172,7 +172,7 @@ func computeLayerMIMEType(what string, layerCompression archive.Compression) (om
 			// how to decompress them, we can't try to compress layers with zstd.
 			return "", "", errors.New("media type for zstd-compressed layers is not defined")
 		default:
-			logrus.Debugf("compressing %s with unknown compressor(?)", what)
+			logrus.Infof("compressing %s with unknown compressor(?)", what)
 		}
 	}
 	return omediaType, dmediaType, nil
@@ -222,7 +222,7 @@ func (i *containerImageRef) extractConfidentialWorkloadFS(options ConfidentialWo
 	rc, _, err := mkcw.Archive(mountPoint, &image, archiveOptions)
 	if err != nil {
 		if _, err2 := i.store.Unmount(i.containerID, false); err2 != nil {
-			logrus.Debugf("unmounting container %q: %v", i.containerID, err2)
+			logrus.Infof("unmounting container %q: %v", i.containerID, err2)
 		}
 		return nil, fmt.Errorf("converting rootfs %q: %w", i.containerID, err)
 	}
@@ -236,7 +236,7 @@ func (i *containerImageRef) extractConfidentialWorkloadFS(options ConfidentialWo
 			}
 			err = err2
 		} else {
-			logrus.Debugf("unmounting container %q: %v", i.containerID, err2)
+			logrus.Infof("unmounting container %q: %v", i.containerID, err2)
 		}
 		return err
 	}), nil
@@ -470,7 +470,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 		layers = append(layers, postLayer.layerID)
 		apiLayerIDs[postLayer.layerID] = true
 	}
-	logrus.Debugf("layer list: %q", layers)
+	logrus.Infof("layer list: %q", layers)
 
 	// It's simpler from here on to keep track of these as a group.
 	apiLayers := append(slices.Clone(i.preLayers), slices.Clone(i.postLayers)...)
@@ -480,7 +480,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 	if err != nil {
 		return nil, fmt.Errorf("creating temporary directory to hold layer blobs: %w", err)
 	}
-	logrus.Debugf("using %q to hold temporary data", path)
+	logrus.Infof("using %q to hold temporary data", path)
 	defer func() {
 		if src == nil {
 			err2 := os.RemoveAll(path)
@@ -502,6 +502,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 	var extraImageContentDiffDigest digest.Digest
 	blobLayers := make(map[digest.Digest]blobLayerInfo)
 	for _, layerID := range layers {
+		logrus.Info("processing layerid: ", layerID)
 		what := fmt.Sprintf("layer %q", layerID)
 		if i.confidentialWorkload.Convert || i.squash {
 			what = fmt.Sprintf("container %q", i.containerID)
@@ -712,7 +713,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 		} else {
 			size = counter.Count
 		}
-		logrus.Debugf("%s size is %d bytes, uncompressed digest %s, possibly-compressed digest %s", what, size, srcHasher.Digest().String(), destHasher.Digest().String())
+		logrus.Infof("%s size is %d bytes, uncompressed digest %s, possibly-compressed digest %s", what, size, srcHasher.Digest().String(), destHasher.Digest().String())
 		// Rename the layer so that we can more easily find it by digest later.
 		finalBlobName := filepath.Join(path, destHasher.Digest().String())
 		if err = os.Rename(filepath.Join(path, "layer"), finalBlobName); err != nil {
@@ -856,7 +857,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 	if err != nil {
 		return nil, fmt.Errorf("encoding %#v as json: %w", oimage, err)
 	}
-	logrus.Debugf("OCIv1 config = %s", oconfig)
+	logrus.Infof("OCIv1 config = %s", oconfig)
 
 	// Add the configuration blob to the manifest.
 	omanifest.Config.Digest = digest.Canonical.FromBytes(oconfig)
@@ -868,14 +869,14 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 	if err != nil {
 		return nil, fmt.Errorf("encoding %#v as json: %w", omanifest, err)
 	}
-	logrus.Debugf("OCIv1 manifest = %s", omanifestbytes)
+	logrus.Infof("OCIv1 manifest = %s", omanifestbytes)
 
 	// Encode the image configuration blob.
 	dconfig, err := json.Marshal(&dimage)
 	if err != nil {
 		return nil, fmt.Errorf("encoding %#v as json: %w", dimage, err)
 	}
-	logrus.Debugf("Docker v2s2 config = %s", dconfig)
+	logrus.Infof("Docker v2s2 config = %s", dconfig)
 
 	// Add the configuration blob to the manifest.
 	dmanifest.Config.Digest = digest.Canonical.FromBytes(dconfig)
@@ -887,7 +888,7 @@ func (i *containerImageRef) NewImageSource(_ context.Context, _ *types.SystemCon
 	if err != nil {
 		return nil, fmt.Errorf("encoding %#v as json: %w", dmanifest, err)
 	}
-	logrus.Debugf("Docker v2s2 manifest = %s", dmanifestbytes)
+	logrus.Infof("Docker v2s2 manifest = %s", dmanifestbytes)
 
 	// Decide which manifest and configuration blobs we'll actually output.
 	var config []byte
@@ -978,15 +979,16 @@ func (i *containerImageSource) LayerInfosForCopy(_ context.Context, _ *digest.Di
 }
 
 func (i *containerImageSource) HasThreadSafeGetBlob() bool {
-	return false
+	logrus.Infof("Returning we have threadsafe getblob")
+	return true
 }
 
 func (i *containerImageSource) GetBlob(_ context.Context, blob types.BlobInfo, _ types.BlobInfoCache) (reader io.ReadCloser, size int64, err error) {
 	if blob.Digest == i.configDigest {
-		logrus.Debugf("start reading config")
+		logrus.Infof("start reading config")
 		reader := bytes.NewReader(i.config)
 		closer := func() error {
-			logrus.Debugf("finished reading config")
+			logrus.Infof("finished reading config")
 			return nil
 		}
 		return ioutils.NewReadCloserWrapper(reader, closer), reader.Size(), nil
@@ -1016,17 +1018,17 @@ func (i *containerImageSource) GetBlob(_ context.Context, blob types.BlobInfo, _
 				layerFile.Close()
 			}
 			if !errors.Is(err, os.ErrNotExist) {
-				logrus.Debugf("error checking for layer %q in %q: %v", blob.Digest.String(), blobDir, err)
+				logrus.Infof("error checking for layer %q in %q: %v", blob.Digest.String(), blobDir, err)
 			}
 		}
 	}
 	if err != nil || layerReadCloser == nil || size == -1 {
-		logrus.Debugf("error reading layer %q: %v", blob.Digest.String(), err)
+		logrus.Infof("error reading layer %q: %v", blob.Digest.String(), err)
 		return nil, -1, fmt.Errorf("opening layer blob: %w", err)
 	}
-	logrus.Debugf("reading layer %q", blob.Digest.String())
+	logrus.Infof("reading layer %q", blob.Digest.String())
 	closer := func() error {
-		logrus.Debugf("finished reading layer %q", blob.Digest.String())
+		logrus.Infof("finished reading layer %q", blob.Digest.String())
 		if err := layerReadCloser.Close(); err != nil {
 			return fmt.Errorf("closing layer %q after reading: %w", blob.Digest.String(), err)
 		}
