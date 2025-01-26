@@ -18,6 +18,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/containers/storage/pkg/fileutils"
 	"github.com/containers/storage/pkg/unshare"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -47,6 +48,7 @@ func getCopyOptions(store storage.Store, reportWriter io.Writer, sourceSystemCon
 		OciEncryptConfig:      ociEncryptConfig,
 		OciDecryptConfig:      ociDecryptConfig,
 		OciEncryptLayers:      ociEncryptLayers,
+		MaxParallelDownloads:  64,
 	}
 }
 
@@ -79,7 +81,10 @@ func retryCopyImageWithOptions(ctx context.Context, policyContext *signature.Pol
 		err           error
 	)
 	err = retry.IfNecessary(ctx, func() error {
+		logrus.Info("will call cp.Image now")
+		copyOptions.ReportWriter = logrus.StandardLogger().Out
 		manifestBytes, err = cp.Image(ctx, policyContext, maybeWrappedDest, maybeWrappedSrc, copyOptions)
+		logrus.Infof("erris %v", err)
 		return err
 	}, &retry.RetryOptions{MaxRetry: maxRetries, Delay: retryDelay, IsErrorRetryable: func(err error) bool {
 		if retryOnLayerUnknown && directDest.Transport().Name() == is.Transport.Name() && errors.Is(err, storage.ErrLayerUnknown) {

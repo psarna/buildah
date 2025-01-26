@@ -978,7 +978,8 @@ func (i *containerImageSource) LayerInfosForCopy(_ context.Context, _ *digest.Di
 }
 
 func (i *containerImageSource) HasThreadSafeGetBlob() bool {
-	return false
+	logrus.Infof("Returning we have threadsafe getblob")
+	return true
 }
 
 func (i *containerImageSource) GetBlob(_ context.Context, blob types.BlobInfo, _ types.BlobInfoCache) (reader io.ReadCloser, size int64, err error) {
