@@ -306,6 +306,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 	systemContext := getSystemContext(b.store, options.SystemContext, options.SignaturePolicyPath)
 
 	blocked, err := isReferenceBlocked(dest, systemContext)
+	logrus.Infof("blocked: %v", blocked)
 	if err != nil {
 		return "", nil, "", fmt.Errorf("checking if committing to registry for %q is blocked: %w", transports.ImageName(dest), err)
 	}
@@ -327,7 +328,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 	}
 	defer func() {
 		if err2 := policyContext.Destroy(); err2 != nil {
-			logrus.Debugf("error destroying signature policy context: %v", err2)
+			logrus.Infof("error destroying signature policy context: %v", err2)
 		}
 	}()
 
@@ -344,7 +345,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 		systemContext.OCIInsecureSkipTLSVerify = true
 		systemContext.DockerDaemonInsecureSkipTLSVerify = true
 	}
-	logrus.Debugf("committing image with reference %q is allowed by policy", transports.ImageName(dest))
+	logrus.Infof("committing image with reference %q is allowed by policy", transports.ImageName(dest))
 
 	// If we need to scan the rootfs, do it now.
 	options.ExtraImageContent = maps.Clone(options.ExtraImageContent)
@@ -430,7 +431,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 			if err = util.AddImageNames(b.store, "", systemContext, img, options.AdditionalTags); err != nil {
 				return imgID, nil, "", fmt.Errorf("setting image names to %v: %w", append(img.Names, options.AdditionalTags...), err)
 			}
-			logrus.Debugf("assigned names %v to image %q", img.Names, img.ID)
+			logrus.Infof("assigned names %v to image %q", img.Names, img.ID)
 		default:
 			logrus.Warnf("don't know how to add tags to images stored in %q transport", dest.Transport().Name())
 		}
@@ -453,7 +454,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 			if err = b.store.RemoveNames(imgID, toPruneNames); err != nil {
 				return imgID, nil, "", fmt.Errorf("failed to remove temporary name from image %q: %w", imgID, err)
 			}
-			logrus.Debugf("removing %v from assigned names to image %q", nameToRemove, img.ID)
+			logrus.Infof("removing %v from assigned names to image %q", nameToRemove, img.ID)
 		}
 		if options.IIDFile != "" {
 			if err = os.WriteFile(options.IIDFile, []byte("sha256:"+img.ID), 0o644); err != nil {
@@ -504,7 +505,7 @@ func (b *Builder) Commit(ctx context.Context, dest types.ImageReference, options
 		if err != nil {
 			return imgID, nil, "", err
 		}
-		logrus.Debugf("added imgID %s to manifestID %s", imgID, manifestID)
+		logrus.Infof("added imgID %s to manifestID %s", imgID, manifestID)
 	}
 	return imgID, ref, manifestDigest, nil
 }
